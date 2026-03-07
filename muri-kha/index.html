@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Muri-Kha — 8-Bit Catcher</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+  }
+  body {
+    background: #0a0a0a;
+    font-family: 'Press Start 2P', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  /* Scale wrapper — JS sets --game-scale on :root */
+  #scale-root {
+    transform-origin: top center;
+    transform: scale(var(--game-scale, 1));
+    /* keep layout space = natural size so centering stays clean */
+    width: 480px;
+  }
+
+  /* ── MENU SCREEN ── */
+  #menu-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  #game-title {
+    color: #FFD700;
+    font-size: 1.6rem;
+    letter-spacing: 4px;
+    text-shadow: 3px 3px 0 #FF6B00, 6px 6px 0 #8B0000;
+    margin-bottom: 10px;
+    animation: titlePulse 2s infinite alternate;
+  }
+  @keyframes titlePulse {
+    from { text-shadow: 3px 3px 0 #FF6B00, 6px 6px 0 #8B0000; }
+    to   { text-shadow: 3px 3px 0 #FF8C00, 6px 6px 0 #CC0000, 0 0 20px #FFD700; }
+  }
+  #subtitle {
+    color: #888;
+    font-size: 8px;
+    letter-spacing: 3px;
+    margin-bottom: 20px;
+  }
+  #menu-box {
+    width: 480px;
+    max-width: 100%;
+    background: #0d0d0d;
+    border: 4px solid #FFD700;
+    box-shadow: 0 0 0 4px #FF6B00, 0 0 0 8px #8B0000, 0 0 40px rgba(255,215,0,0.2);
+    padding: 32px 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+  .good-item { color: #55FF55; }
+  .bad-item  { color: #FF5555; }
+  .spec-item { color: #FFD700; }
+  #menu-box p {
+    color: #ccc;
+    font-size: 9px;
+    text-align: center;
+    line-height: 2;
+  }
+  .legend-section {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .legend-label { font-size: 8px; letter-spacing: 1px; }
+  .legend-items {
+    display: flex;
+    gap: 16px;
+    align-items: flex-end;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+  }
+  .legend-item canvas { image-rendering: pixelated; }
+  .legend-item-name { font-size: 6px; color: #888; text-align: center; }
+  .legend-pts { font-size: 7px; font-weight: bold; }
+  .legend-divider { width: 80%; border: none; border-top: 1px solid #333; margin: 2px 0; }
+  #start-btn, #restart-btn {
+    background: #FFD700;
+    color: #000;
+    border: none;
+    padding: 12px 28px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 #8B6500;
+    transition: transform 0.1s;
+  }
+  #start-btn:hover, #restart-btn:hover {
+    transform: translate(2px, 2px);
+    box-shadow: 2px 2px 0 #8B6500;
+  }
+  #controls-hint {
+    color: #555;
+    font-size: 7px;
+    letter-spacing: 2px;
+  }
+
+  /* ── GAME SCREEN ── */
+  #game-title-small {
+    color: #FFD700;
+    font-size: 0.9rem;
+    letter-spacing: 4px;
+    text-shadow: 2px 2px 0 #FF6B00, 4px 4px 0 #8B0000;
+    margin-bottom: 8px;
+    animation: titlePulse 2s infinite alternate;
+  }
+  #game-container {
+    display: block;
+    border: 4px solid #FFD700;
+    box-shadow: 0 0 0 4px #FF6B00, 0 0 0 8px #8B0000, 0 0 40px rgba(255,215,0,0.3);
+    image-rendering: pixelated;
+    touch-action: none;
+    user-select: none;
+  }
+  #ui-bar {
+    width: 480px;
+    max-width: 100%;
+    background: #111;
+    border: 4px solid #FFD700;
+    border-top: none;
+    padding: 6px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 0 0 4px #FF6B00, 0 0 0 8px #8B0000;
+  }
+  .ui-label { color: #aaa; font-size: 7px; }
+  .ui-value { color: #FFD700; font-size: 10px; }
+  #lives-display { color: #FF4444; font-size: 13px; letter-spacing: 2px; }
+
+  /* ── PAUSE OVERLAY ── */
+  #pause-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.82);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    gap: 16px;
+    padding: 20px;
+  }
+  #pause-title {
+    color: #FFD700;
+    font-size: 20px;
+    text-shadow: 3px 3px 0 #FF6B00;
+    letter-spacing: 3px;
+  }
+  #resume-btn {
+    background: #FFD700;
+    color: #000;
+    border: none;
+    padding: 12px 28px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 #8B6500;
+    transition: transform 0.1s;
+  }
+  #resume-btn:hover { transform: translate(2px,2px); box-shadow: 2px 2px 0 #8B6500; }
+  #pause-restart-btn, #pause-home-btn {
+    background: transparent;
+    color: #aaa;
+    border: 2px solid #555;
+    padding: 10px 20px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  #pause-restart-btn:hover, #pause-home-btn:hover { color: #FFD700; border-color: #FFD700; }
+
+  /* ── PAUSE BUTTON (ui-bar) ── */
+  #pause-btn, #ingame-mute-btn {
+    background: transparent;
+    color: #aaa;
+    border: 1px solid #444;
+    padding: 4px 10px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  #pause-btn:hover, #ingame-mute-btn:hover { color: #FFD700; border-color: #FFD700; }
+  #ingame-mute-btn.muted { color: #555; border-color: #333; }
+
+  /* ── IN-GAME OVERLAY (game over) ── */
+  #overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.88);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    gap: 16px;
+    padding: 20px;
+  }
+  #overlay h2 {
+    color: #FFD700;
+    font-size: 22px;
+    text-shadow: 3px 3px 0 #FF6B00;
+  }
+  #score-final { color: #FF6B00; font-size: 14px; }
+  #overlay-hi  { color: #aaa; font-size: 9px; }
+  #home-btn {
+    background: transparent;
+    color: #aaa;
+    border: 2px solid #555;
+    padding: 10px 20px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 9px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  #home-btn:hover { color: #FFD700; border-color: #FFD700; }
+
+  /* ── MOBILE D-PAD ── */
+  #dpad {
+    width: 480px;
+    max-width: 100%;
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 4px 4px;
+    gap: 8px;
+    box-sizing: border-box;
+  }
+  #dpad-left, #dpad-right {
+    flex: 1;
+    background: rgba(255, 215, 0, 0.12);
+    border: 3px solid #FFD700;
+    color: #FFD700;
+    font-size: 28px;
+    padding: 18px 0;
+    font-family: 'Press Start 2P', monospace;
+    cursor: pointer;
+    border-radius: 4px;
+    box-shadow: 0 0 0 2px #FF6B00;
+    transition: background 0.08s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    touch-action: none;
+  }
+  #dpad-left:active, #dpad-right:active,
+  #dpad-left.pressed, #dpad-right.pressed {
+    background: rgba(255, 215, 0, 0.30);
+  }
+
+  /* ── MUSIC BUTTON ── */
+  #music-btn {
+    background: transparent;
+    color: #55FF55;
+    border: 1px solid #336633;
+    padding: 6px 16px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  #music-btn:hover { color: #FFD700; border-color: #FFD700; }
+  #music-btn.muted { color: #555; border-color: #333; }
+
+  /* ── CREDITS BUTTON ── */
+  #credits-btn {
+    background: transparent;
+    color: #555;
+    border: 1px solid #333;
+    padding: 6px 16px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 7px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: color 0.2s, border-color 0.2s;
+  }
+  #credits-btn:hover { color: #FFD700; border-color: #FFD700; }
+
+  /* ── CREDITS MODAL ── */
+  #credits-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  #credits-box {
+    background: #0d0d0d;
+    border: 4px solid #FFD700;
+    box-shadow: 0 0 0 4px #FF6B00, 0 0 0 8px #8B0000, 0 0 40px rgba(255,215,0,0.25);
+    padding: 36px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    min-width: 320px;
+    text-align: center;
+  }
+  #credits-title {
+    color: #FFD700;
+    font-size: 14px;
+    letter-spacing: 3px;
+    text-shadow: 2px 2px 0 #FF6B00;
+  }
+  #credits-body {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  #credits-body p {
+    color: #ccc;
+    font-size: 8px;
+    line-height: 2.2;
+  }
+  #credits-link {
+    color: #888;
+    font-size: 7px;
+    font-family: 'Press Start 2P', monospace;
+    text-decoration: none;
+    letter-spacing: 1px;
+    transition: color 0.2s;
+  }
+  #credits-link:hover { color: #FFD700; }
+  #credits-close {
+    background: transparent;
+    color: #FF4444;
+    border: 2px solid #FF4444;
+    padding: 8px 20px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  #credits-close:hover { background: #FF4444; color: #000; }
+</style>
+</head>
+<body>
+
+<div id="scale-root">
+
+<!-- MENU SCREEN (shown first, hidden on start) -->
+<div id="menu-screen">
+  <div id="game-title">MURI-KHA</div>
+  <div id="subtitle">◄ THE GREAT BANGLADESHI CATCH ►</div>
+  <div id="menu-box">
+    <!-- GOOD items -->
+    <div class="legend-section">
+      <div class="legend-label good-item">★ CATCH THESE · +10 PTS (GLOWING = +50)</div>
+      <div class="legend-items" id="good-items-row"></div>
+    </div>
+    <hr class="legend-divider">
+    <!-- BAD items -->
+    <div class="legend-section">
+      <div class="legend-label bad-item">✖ AVOID THESE · -10 PTS · -1 LIFE</div>
+      <div class="legend-items" id="bad-items-row"></div>
+    </div>
+    <hr class="legend-divider">
+    <p>USE ← → ARROW KEYS OR A/D TO MOVE</p>
+    <button id="start-btn" onclick="startGame()">▶ START GAME</button>
+    <div id="controls-hint">MOUSE ALSO SUPPORTED</div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <button id="credits-btn" onclick="document.getElementById('credits-modal').style.display='flex'">CREDITS</button>
+      <button id="music-btn" onclick="toggleMusic()">♪ MUSIC: ON</button>
+    </div>
+  </div>
+</div><!-- #menu-screen -->
+
+<!-- GAME SCREEN (hidden until start) -->
+<div id="game-screen" style="display:none; flex-direction:column; align-items:center;">
+  <div id="game-title-small">MURI-KHA</div>
+  <div style="position:relative; line-height:0;">
+    <div id="game-container"></div>
+    <!-- In-game overlay for Game Over -->
+    <div id="overlay" style="display:none;">
+      <h2 id="overlay-title">GAME OVER</h2>
+      <div id="score-final"></div>
+      <p id="overlay-hi"></p>
+      <button id="restart-btn" onclick="restartGame()">▶ PLAY AGAIN</button>
+      <button id="home-btn" onclick="goHome()">⌂ MAIN MENU</button>
+    </div>
+    <!-- Pause overlay -->
+    <div id="pause-overlay" style="display:none;">
+      <h2 id="pause-title">⏸ PAUSED</h2>
+      <button id="resume-btn" onclick="resumeGame()">▶ RESUME</button>
+      <button id="pause-restart-btn" onclick="restartGame()">↺ RESTART</button>
+      <button id="pause-home-btn" onclick="goHome()">⌂ MAIN MENU</button>
+    </div>
+  </div>
+  <div id="ui-bar">
+    <div>
+      <div class="ui-label">SCORE</div>
+      <div class="ui-value" id="score-display">0</div>
+    </div>
+    <div style="text-align:center;">
+      <div class="ui-label">LIVES</div>
+      <div id="lives-display">♥ ♥ ♥</div>
+    </div>
+    <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+      <div>
+        <div class="ui-label">HIGH SCORE</div>
+        <div class="ui-value" id="hi-display">0</div>
+      </div>
+      <button id="pause-btn" onclick="pauseGame()">⏸ PAUSE</button>
+      <button id="ingame-mute-btn" onclick="toggleInGameMute()">♪ MUTE</button>
+    </div>
+  </div>
+  <!-- Mobile D-Pad — only shown on touch devices via JS -->
+  <div id="dpad" style="display:none;">
+    <button id="dpad-left"  ontouchstart="dpadStart('left')"  ontouchend="dpadEnd()" ontouchcancel="dpadEnd()">◀</button>
+    <button id="dpad-right" ontouchstart="dpadStart('right')" ontouchend="dpadEnd()" ontouchcancel="dpadEnd()">▶</button>
+  </div>
+</div><!-- #game-screen -->
+
+</div><!-- #scale-root -->
+
+<!-- Credits Modal (outside scale-root so it covers the real viewport) -->
+<div id="credits-modal">
+  <div id="credits-box">
+    <div id="credits-title">✦ CREDITS ✦</div>
+    <div id="credits-body">
+      <p>Built using <span class="spec-item">Claude</span><br>by Anthropic.</p>
+      <p>Designed by<br><span class="spec-item">Shamah M Zoha</span></p>
+      <a href="https://github.com/smzoha" target="_blank" id="credits-link">@ github.com/smzoha</a>
+    </div>
+    <button id="credits-close" onclick="document.getElementById('credits-modal').style.display='none'">✕ CLOSE</button>
+  </div>
+</div>
+
+<script>
+let game, gameScene;
+let hiScore = 0;
+
+// ─── RESPONSIVE SCALING ──────────────────────────────────────────────────────
+function applyScale() {
+  const GAME_W = 480;
+  const available = window.innerWidth - 16; // 8px breathing room each side
+  const scale = Math.min(1, available / GAME_W);
+  document.documentElement.style.setProperty('--game-scale', scale);
+
+  // When scaled down the element still occupies GAME_W px of layout space.
+  // Collapse that dead space with negative margins so body centering still works.
+  const root = document.getElementById('scale-root');
+  if (root) {
+    const excess = GAME_W * (1 - scale);
+    root.style.marginBottom = `-${excess}px`; // collapse vertical dead space too
+    // horizontal centering is handled by body flexbox; no margin tweak needed
+    // as long as transform-origin is "top center"
+  }
+}
+applyScale();
+window.addEventListener('resize', applyScale);
+window.addEventListener('orientationchange', () => setTimeout(applyScale, 200));
+
+// ─── MOBILE D-PAD ─────────────────────────────────────────────────────────────
+window._dpadLeft  = false;
+window._dpadRight = false;
+
+function dpadStart(dir) {
+  window._dpadLeft  = dir === 'left';
+  window._dpadRight = dir === 'right';
+  document.getElementById('dpad-' + dir).classList.add('pressed');
+}
+function dpadEnd() {
+  window._dpadLeft  = false;
+  window._dpadRight = false;
+  document.getElementById('dpad-left').classList.remove('pressed');
+  document.getElementById('dpad-right').classList.remove('pressed');
+}
+
+// Show d-pad only on touch-capable devices
+function checkTouchDevice() {
+  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  if (isTouch) document.getElementById('dpad').style.display = 'flex';
+}
+checkTouchDevice();
+
+// ─── pixel art drawing helpers ───────────────────────────────────────────────
+function px(g, pixels, ox, oy, scale, colors) {
+  pixels.forEach((row, ry) => {
+    row.forEach((c, rx) => {
+      if (c === 0) return;
+      g.fillStyle(colors[c - 1], 1);
+      g.fillRect(ox + rx * scale, oy + ry * scale, scale, scale);
+    });
+  });
+}
+
+// ─── Draw pixel art onto a plain <canvas> for the menu ───────────────────────
+function pxCanvas(pixels, colors, scale) {
+  const cols = pixels[0].length, rows = pixels.length;
+  const c = document.createElement('canvas');
+  c.width = cols * scale; c.height = rows * scale;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  pixels.forEach((row, ry) => {
+    row.forEach((v, rx) => {
+      if (!v) return;
+      ctx.fillStyle = colors[v - 1];
+      ctx.fillRect(rx * scale, ry * scale, scale, scale);
+    });
+  });
+  return c;
+}
+
+// ─── Build the menu item previews ────────────────────────────────────────────
+function buildMenuPreviews() {
+  const S = 6; // bigger scale for menu display
+
+  const items = [
+    {
+      id: 'good-items-row',
+      list: [
+        { name: 'MURI', pixels: [
+          [0,1,1,1,0,0,1,0],
+          [1,1,2,1,1,1,1,1],
+          [1,2,1,1,2,1,2,1],
+          [1,1,1,2,1,1,1,1],
+          [0,1,2,1,1,2,1,0],
+          [0,0,1,1,1,1,0,0],
+        ], colors: ['#f0f0f0','#d0d0d0'] },
+        { name: 'CHANACHUR', pixels: [
+          [0,1,2,1,2,1,0],
+          [1,2,1,3,1,2,1],
+          [2,1,3,2,3,1,2],
+          [1,3,2,1,2,3,1],
+          [0,1,2,3,2,1,0],
+          [0,0,1,1,1,0,0],
+        ], colors: ['#d4820a','#ff9f00','#c05000'] },
+        { name: 'PEANUTS', pixels: [
+          [0,1,1,0,1,1,0],
+          [1,2,1,0,1,2,1],
+          [1,1,1,0,1,1,1],
+          [0,1,1,1,1,1,0],
+          [0,0,1,2,1,0,0],
+          [0,0,1,1,1,0,0],
+        ], colors: ['#c8a060','#e8c080'] },
+        { name: 'ONION', pixels: [
+          [0,0,1,1,1,0,0],
+          [0,1,2,2,2,1,0],
+          [1,2,3,2,3,2,1],
+          [1,2,2,3,2,2,1],
+          [0,1,2,2,2,1,0],
+          [0,0,1,1,1,0,0],
+          [0,0,0,4,0,0,0],
+        ], colors: ['#9b3b8b','#c060b0','#d080c8','#55bb44'] },
+      ]
+    },
+    {
+      id: 'bad-items-row',
+      list: [
+        { name: 'CHILI BOMB', pixels: [
+          [0,0,0,2,0,0,0],
+          [0,0,1,1,1,0,0],
+          [0,1,1,3,1,1,0],
+          [1,1,3,1,3,1,1],
+          [1,1,1,3,1,1,1],
+          [0,1,1,1,1,1,0],
+          [0,0,1,1,1,0,0],
+        ], colors: ['#dd1111','#ff5500','#ff8800'] },
+        { name: 'STONE', pixels: [
+          [0,1,1,2,1,0],
+          [1,2,1,1,2,1],
+          [1,1,2,1,1,1],
+          [2,1,1,2,1,2],
+          [1,1,2,1,1,1],
+          [0,1,1,1,1,0],
+        ], colors: ['#888888','#aaaaaa'] },
+        { name: 'SPOILED', pixels: [
+          [0,1,1,1,1,0],
+          [1,2,1,2,1,1],
+          [1,1,2,1,2,1],
+          [1,3,1,1,1,1],
+          [0,1,1,3,1,0],
+          [0,0,1,1,0,0],
+        ], colors: ['#447700','#88cc00','#aadd22'] },
+      ]
+    }
+  ];
+
+  items.forEach(({ id, list }) => {
+    const row = document.getElementById(id);
+    list.forEach(({ name, pixels, colors }) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'legend-item';
+      const c = pxCanvas(pixels, colors, S);
+      const label = document.createElement('div');
+      label.className = 'legend-item-name';
+      label.textContent = name;
+      wrap.appendChild(c);
+      wrap.appendChild(label);
+      row.appendChild(wrap);
+    });
+  });
+}
+
+// ─── sprite factories ────────────────────────────────────────────────────────
+function makeTextures(scene) {
+  const S = 4; // pixel scale
+
+  // ── PLAYER (person with basket) ─────────────────────────────────────────
+  // 14×18 tiles, drawn at scale 4 = 56×72
+  const playerPx = [
+    [0,0,0,1,1,1,1,0,0,0],  // hair
+    [0,0,1,2,2,2,2,1,0,0],  // head
+    [0,0,1,2,2,2,2,1,0,0],
+    [0,0,1,2,3,3,2,1,0,0],  // eyes
+    [0,0,1,2,2,2,2,1,0,0],  // mouth
+    [0,0,0,1,1,1,1,0,0,0],  // neck
+    [0,1,1,4,4,4,4,1,1,0],  // shoulders
+    [1,4,4,4,4,4,4,4,4,1],  // body
+    [1,4,4,4,4,4,4,4,4,1],
+    [0,1,4,4,4,4,4,4,1,0],
+    [0,1,5,5,5,5,5,5,1,0],  // legs
+    [0,1,5,5,5,5,5,5,1,0],
+    [0,1,6,5,0,0,5,6,1,0],  // feet
+  ];
+  // basket — silver-to-purple gradient (1=silver highlight, 2=silver mid, 3=purple mid, 4=deep purple)
+  const basketPx = [
+    [1,0,0,0,0,0,0,0,0,1],  // top rim — bright silver
+    [2,2,2,2,2,2,2,2,2,2],  // upper body — silver
+    [0,3,3,3,3,3,3,3,3,0],  // lower body — purple-silver blend
+    [0,0,4,4,4,4,4,4,0,0],  // base — deep purple
+  ];
+  const pColors = [0x3d1a00, 0xf5c98a, 0x2a1a00, 0xffffff, 0x3355cc, 0x442266, 0x2a0a00];
+  // silver highlight, silver mid, purple-silver blend, deep purple
+  const bColors = [0xe8e8f8, 0xb0b8cc, 0x9070bb, 0x5c2d91];
+
+  let g = scene.add.graphics();
+  // player body (uses pColors)
+  g.clear();
+  px(g, playerPx, 4, 16, S, pColors);
+  g.generateTexture('player_body', 10*S+8, 13*S+16);
+  // basket (uses bColors — silver/purple gradient)
+  g.clear();
+  px(g, basketPx, 0, 0, S, bColors);
+  g.generateTexture('basket', 10*S, 4*S);
+  g.destroy();
+
+  // ── GOOD ITEMS ───────────────────────────────────────────────────────────
+  // MURI (puffed rice) — white bubbly blob
+  g = scene.add.graphics();
+  const muriPx = [
+    [0,1,1,1,0,0,1,0],
+    [1,1,2,1,1,1,1,1],
+    [1,2,1,1,2,1,2,1],
+    [1,1,1,2,1,1,1,1],
+    [0,1,2,1,1,2,1,0],
+    [0,0,1,1,1,1,0,0],
+  ];
+  px(g, muriPx, 0, 0, S, [0xf0f0f0, 0xd0d0d0]);
+  g.generateTexture('muri', 8*S, 6*S);
+  g.destroy();
+
+  // CHANACHUR — golden crunchy mix
+  g = scene.add.graphics();
+  const chanaPx = [
+    [0,1,2,1,2,1,0],
+    [1,2,1,3,1,2,1],
+    [2,1,3,2,3,1,2],
+    [1,3,2,1,2,3,1],
+    [0,1,2,3,2,1,0],
+    [0,0,1,1,1,0,0],
+  ];
+  px(g, chanaPx, 0, 0, S, [0xd4820a, 0xff9f00, 0xc05000]);
+  g.generateTexture('chanachur', 7*S, 6*S);
+  g.destroy();
+
+  // PEANUTS — tan oval shapes
+  g = scene.add.graphics();
+  const peanutPx = [
+    [0,1,1,0,1,1,0],
+    [1,2,1,0,1,2,1],
+    [1,1,1,0,1,1,1],
+    [0,1,1,1,1,1,0],
+    [0,0,1,2,1,0,0],
+    [0,0,1,1,1,0,0],
+  ];
+  px(g, peanutPx, 0, 0, S, [0xc8a060, 0xe8c080]);
+  g.generateTexture('peanuts', 7*S, 6*S);
+  g.destroy();
+
+  // ONION — purple layered circle
+  g = scene.add.graphics();
+  const onionPx = [
+    [0,0,1,1,1,0,0],
+    [0,1,2,2,2,1,0],
+    [1,2,3,2,3,2,1],
+    [1,2,2,3,2,2,1],
+    [0,1,2,2,2,1,0],
+    [0,0,1,1,1,0,0],
+    [0,0,0,4,0,0,0],
+  ];
+  px(g, onionPx, 0, 0, S, [0x9b3b8b, 0xc060b0, 0xd080c8, 0x55bb44]);
+  g.generateTexture('onion', 7*S, 7*S);
+  g.destroy();
+
+  // ── BAD ITEMS ────────────────────────────────────────────────────────────
+  // CHILI BOMB — red round with fuse
+  g = scene.add.graphics();
+  const chiliPx = [
+    [0,0,0,2,0,0,0],
+    [0,0,1,1,1,0,0],
+    [0,1,1,3,1,1,0],
+    [1,1,3,1,3,1,1],
+    [1,1,1,3,1,1,1],
+    [0,1,1,1,1,1,0],
+    [0,0,1,1,1,0,0],
+  ];
+  px(g, chiliPx, 0, 0, S, [0xdd1111, 0xff5500, 0xff8800]);
+  // fuse spark
+  g.fillStyle(0xffff00, 1);
+  g.fillRect(3*S, 0, S, S);
+  g.generateTexture('chili_bomb', 7*S, 7*S);
+  g.destroy();
+
+  // STONE — grey jagged shape
+  g = scene.add.graphics();
+  const stonePx = [
+    [0,1,1,2,1,0],
+    [1,2,1,1,2,1],
+    [1,1,2,1,1,1],
+    [2,1,1,2,1,2],
+    [1,1,2,1,1,1],
+    [0,1,1,1,1,0],
+  ];
+  px(g, stonePx, 0, 0, S, [0x888888, 0xaaaaaa]);
+  g.generateTexture('stone', 6*S, 6*S);
+  g.destroy();
+
+  // SPOILED FOOD — greenish oozing blob
+  g = scene.add.graphics();
+  const spoilPx = [
+    [0,1,1,1,1,0],
+    [1,2,1,2,1,1],
+    [1,1,2,1,2,1],
+    [1,3,1,1,1,1],
+    [0,1,1,3,1,0],
+    [0,0,1,1,0,0],
+  ];
+  px(g, spoilPx, 0, 0, S, [0x447700, 0x88cc00, 0xaadd22]);
+  g.generateTexture('spoiled', 6*S, 6*S);
+  g.destroy();
+
+  // ── PARTICLES & EFFECTS ──────────────────────────────────────────────────
+  g = scene.add.graphics();
+  g.fillStyle(0xffffff, 1);
+  g.fillRect(0, 0, 6, 6);
+  g.generateTexture('particle', 6, 6);
+  g.destroy();
+
+  // star glow (for special items)
+  g = scene.add.graphics();
+  g.fillStyle(0xFFFFAA, 0.9);
+  g.fillCircle(8, 8, 8);
+  g.generateTexture('glow', 16, 16);
+  g.destroy();
+
+  // ground line
+  g = scene.add.graphics();
+  g.fillStyle(0x334433, 1);
+  g.fillRect(0, 0, 480, 6);
+  for (let x = 0; x < 480; x += 8) {
+    g.fillStyle(0x22aa44, 1);
+    g.fillRect(x, 0, 4, 2);
+  }
+  g.generateTexture('ground', 480, 6);
+  g.destroy();
+}
+
+// ─── MAIN SCENE ─────────────────────────────────────────────────────────────
+class GameScene extends Phaser.Scene {
+  constructor() { super({ key: 'GameScene' }); }
+
+  preload() {}
+
+  create() {
+    gameScene = this;
+    this.score = 0;
+    this.lives = 3;
+    this.gameOver = false;
+    this.paused = false;
+    this.spawnDelay = 1400;
+    this.speedBase = 120;
+    this.waveCount = 0;
+
+    makeTextures(this);
+
+    // ground
+    this.add.image(240, 537, 'ground').setOrigin(0.5, 0);
+
+    // starfield bg — twinkling dots
+    this.stars = [];
+    for (let i = 0; i < 70; i++) {
+      const x = Phaser.Math.Between(0, 480);
+      const y = Phaser.Math.Between(0, 520);
+      const s = Math.random() < 0.25 ? 2 : 1;
+      const star = this.add.rectangle(x, y, s, s, 0xffffff, Phaser.Math.FloatBetween(0.15, 0.7));
+      star.setDepth(1);
+      this.stars.push({ obj: star, twinkle: Phaser.Math.FloatBetween(0, Math.PI * 2), speed: Phaser.Math.FloatBetween(1.5, 3.5) });
+    }
+
+    // shooting stars pool
+    this.shootingStars = [];
+    for (let i = 0; i < 4; i++) {
+      const line = this.add.graphics().setDepth(2);
+      this.shootingStars.push({ gfx: line, active: false, x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 0, len: 0 });
+    }
+    // fire shooting stars on a staggered random timer
+    this.time.addEvent({ delay: Phaser.Math.Between(1200, 2800), callback: this.launchShootingStar, callbackScope: this, loop: false });
+
+
+    // pixel grid scanline overlay (subtle)
+    const scanG = this.add.graphics();
+    for (let y = 0; y < 540; y += 4) {
+      scanG.fillStyle(0x000000, 0.06);
+      scanG.fillRect(0, y, 480, 1);
+    }
+    scanG.setDepth(100);
+
+    // player container
+    this.playerContainer = this.add.container(240, 490);
+    this.basketSprite = this.add.image(0, -28, 'basket');
+    this.bodySprite   = this.add.image(0, 10, 'player_body');
+    this.playerContainer.add([this.basketSprite, this.bodySprite]);
+    this.playerContainer.setDepth(10);
+
+    // input
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.wasd = this.input.keyboard.addKeys({ left: Phaser.Input.Keyboard.KeyCodes.A, right: Phaser.Input.Keyboard.KeyCodes.D });
+    this.escKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    this.escKey.on('down', () => {
+      if (this.gameOver) return;
+      if (this.paused) resumeGame(); else pauseGame();
+    });
+    this.mKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.M);
+    this.mKey.on('down', () => { if (!this.gameOver) toggleInGameMute(); });
+
+    this._targetX     = 240;
+    this._pointerDown = false;
+    this._isTouch     = false;
+
+    // Mouse follow (desktop only — touch is handled by the d-pad buttons)
+    this.input.on('pointerdown', (ptr) => {
+      if (this.gameOver || this.paused || ptr.wasTouch) return;
+      this._targetX = Phaser.Math.Clamp(ptr.x, 40, 440);
+    });
+    this.input.on('pointermove', (ptr) => {
+      if (this.gameOver || this.paused || ptr.wasTouch) return;
+      this._targetX = Phaser.Math.Clamp(ptr.x, 40, 440);
+    });
+
+    // falling items group
+    this.items = this.add.group();
+
+    // particle emitter
+    this.particles = this.add.particles(0, 0, 'particle', {
+      lifespan: 600,
+      speed: { min: 60, max: 160 },
+      scale: { start: 1, end: 0 },
+      alpha: { start: 1, end: 0 },
+      quantity: 8,
+      emitting: false
+    });
+
+    // HUD
+    this.scoreText = this.add.text(8, 8, 'SCORE: 0', {
+      fontFamily: 'Press Start 2P', fontSize: '10px', color: '#FFD700', stroke: '#000', strokeThickness: 3
+    }).setDepth(20);
+
+    this.livesText = this.add.text(8, 24, '♥ ♥ ♥', {
+      fontFamily: 'Press Start 2P', fontSize: '10px', color: '#FF4444', stroke: '#000', strokeThickness: 3
+    }).setDepth(20);
+
+    this.comboText = this.add.text(240, 30, '', {
+      fontFamily: 'Press Start 2P', fontSize: '9px', color: '#FF8800', stroke: '#000', strokeThickness: 3
+    }).setOrigin(0.5).setDepth(20);
+
+    // spawn timer
+    this.spawnTimer = this.time.addEvent({
+      delay: this.spawnDelay,
+      callback: this.spawnItem,
+      callbackScope: this,
+      loop: true
+    });
+
+    // difficulty ramp
+    this.time.addEvent({
+      delay: 8000,
+      callback: this.rampDifficulty,
+      callbackScope: this,
+      loop: true
+    });
+
+    this.combo = 0;
+  }
+
+  launchShootingStar() {
+    if (this.gameOver) return;
+    // find an inactive slot
+    const ss = this.shootingStars.find(s => !s.active);
+    if (ss) {
+      ss.active = true;
+      ss.x = Phaser.Math.Between(20, 460);
+      ss.y = Phaser.Math.Between(10, 180);
+      const angle = Phaser.Math.FloatBetween(0.3, 0.7); // radians, diagonal downward-right
+      const spd = Phaser.Math.Between(320, 560);
+      ss.vx = Math.cos(angle) * spd;
+      ss.vy = Math.sin(angle) * spd;
+      ss.maxLife = Phaser.Math.FloatBetween(0.35, 0.65);
+      ss.life = ss.maxLife;
+      ss.len = Phaser.Math.Between(30, 70);
+    }
+    // schedule next one
+    this.time.addEvent({ delay: Phaser.Math.Between(1800, 5000), callback: this.launchShootingStar, callbackScope: this, loop: false });
+  }
+
+  rampDifficulty() {
+    this.spawnDelay = Math.max(500, this.spawnDelay - 80);
+    this.speedBase  = Math.min(300, this.speedBase + 15);
+    this.spawnTimer.reset({ delay: this.spawnDelay, callback: this.spawnItem, callbackScope: this, loop: true });
+  }
+
+  spawnItem() {
+    if (this.gameOver) return;
+
+    const goodKeys = ['muri','chanachur','peanuts','onion'];
+    const badKeys  = ['chili_bomb','stone','spoiled'];
+    const isGood   = Math.random() < 0.60;
+    const isSpecial = isGood && Math.random() < 0.12;
+    const key = isGood
+      ? goodKeys[Phaser.Math.Between(0, goodKeys.length-1)]
+      : badKeys[Phaser.Math.Between(0, badKeys.length-1)];
+
+    const x = Phaser.Math.Between(30, 450);
+    const img = this.add.image(x, -20, key).setDepth(5);
+    img.setScale(1);
+
+    // glow halo for special
+    let glowObj = null;
+    if (isSpecial) {
+      glowObj = this.add.image(x, -20, 'glow').setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.8).setScale(2.5).setDepth(4);
+      this.tweens.add({ targets: glowObj, scaleX: 3.2, scaleY: 3.2, alpha: 0.4, yoyo: true, repeat: -1, duration: 400 });
+    }
+
+    const speed = Phaser.Math.FloatBetween(this.speedBase, this.speedBase * 1.4);
+    const wobble = Phaser.Math.FloatBetween(-30, 30);
+
+    // spin
+    this.tweens.add({ targets: img, angle: 360, duration: 1200 + Math.random()*800, repeat: -1 });
+
+    img._data = { isGood, isSpecial, speed, wobble, glowObj, hit: false };
+    this.items.add(img);
+  }
+
+  update(time, delta) {
+    if (this.gameOver || this.paused) return;
+    const dt = delta / 1000;
+
+    // star twinkle
+    this.stars.forEach(s => {
+      s.twinkle += dt * s.speed;
+      s.obj.setAlpha(0.15 + 0.55 * Math.abs(Math.sin(s.twinkle)));
+    });
+
+    // shooting stars
+    this.shootingStars.forEach(ss => {
+      if (!ss.active) { ss.gfx.clear(); return; }
+      ss.life -= dt;
+      if (ss.life <= 0) { ss.active = false; ss.gfx.clear(); return; }
+      ss.x += ss.vx * dt;
+      ss.y += ss.vy * dt;
+      const prog = ss.life / ss.maxLife; // 1→0 as it dies
+      const alpha = Math.min(1, prog * 2.5);
+      const tailLen = ss.len * prog;
+      ss.gfx.clear();
+      // draw gradient tail: bright head fading to transparent tail
+      const steps = 8;
+      for (let i = 0; i < steps; i++) {
+        const t = i / steps;
+        const a = alpha * (1 - t) * 0.9;
+        const tx = ss.x - (ss.vx / Math.hypot(ss.vx, ss.vy)) * tailLen * t;
+        const ty = ss.y - (ss.vy / Math.hypot(ss.vx, ss.vy)) * tailLen * t;
+        ss.gfx.fillStyle(0xffffff, a);
+        ss.gfx.fillRect(tx, ty, 2, 2);
+      }
+      // bright head pixel
+      ss.gfx.fillStyle(0xffffff, alpha);
+      ss.gfx.fillRect(ss.x - 1, ss.y - 1, 3, 3);
+    });
+
+    // player movement
+    const speed    = 520;
+    const dpadSpeed = 400;
+    const keyLeft  = this.cursors.left.isDown  || this.wasd.left.isDown;
+    const keyRight = this.cursors.right.isDown || this.wasd.right.isDown;
+    const dpLeft   = window._dpadLeft;
+    const dpRight  = window._dpadRight;
+
+    if (keyLeft || keyRight || dpLeft || dpRight) {
+      const s   = (dpLeft || dpRight) ? dpadSpeed : speed;
+      const dir = (keyRight || dpRight) ? 1 : -1;
+      this.playerContainer.x += dir * s * dt;
+      this.playerContainer.x = Phaser.Math.Clamp(this.playerContainer.x, 40, 440);
+      this._targetX = this.playerContainer.x;
+    } else if (!this._isTouch) {
+      // Mouse only: smooth lerp follow
+      this.playerContainer.x += (this._targetX - this.playerContainer.x) * 0.18;
+      this.playerContainer.x = Phaser.Math.Clamp(this.playerContainer.x, 40, 440);
+    }
+    // Touch movement driven by d-pad buttons above — no canvas touch tracking needed
+
+    // update items
+    // basketSprite is at local y=-28, playerContainer.y=490, so basket opening is around y=462
+    const basketCatchY = this.playerContainer.y - 28;
+    const catchHalfW = 36;
+
+    this.items.getChildren().forEach(item => {
+      if (item._data.hit) return;
+      const d = item._data;
+      item.y += d.speed * dt;
+      item.x += Math.sin(item.y * 0.04) * d.wobble * dt;
+      if (d.glowObj) { d.glowObj.x = item.x; d.glowObj.y = item.y; }
+
+      // catch check: item must be at or just past the basket opening level
+      const nearX = Math.abs(item.x - this.playerContainer.x) < catchHalfW;
+      const nearY = item.y >= basketCatchY - 8 && item.y <= basketCatchY + 18;
+
+      if (nearX && nearY) {
+        d.hit = true;
+        if (d.glowObj) d.glowObj.destroy();
+        this.catchItem(item, d.isGood, d.isSpecial);
+        item.destroy();
+        return;
+      }
+
+      // missed (fell off screen)
+      if (item.y > 545) {
+        d.hit = true;
+        if (d.glowObj) d.glowObj.destroy();
+        item.destroy();
+      }
+    });
+  }
+
+  catchItem(item, isGood, isSpecial) {
+    const pts = isSpecial ? 50 : 10;
+
+    if (isGood) {
+      this.score += pts;
+      this.combo++;
+      // color by type
+      const col = isSpecial ? 0xFFD700 : 0x55FF55;
+      this.particles.setPosition(item.x, item.y);
+      this.particles.setParticleTint(col);
+      this.particles.explode(isSpecial ? 18 : 10);
+      this.flashScore(`+${pts}`, item.x, item.y, isSpecial ? '#FFD700' : '#55FF55');
+      if (this.combo >= 3) this.showCombo();
+      MusicEngine.sfxGood(isSpecial);
+    } else {
+      this.score = Math.max(0, this.score - 10);
+      this.combo = 0;
+      this.lives--;
+      this.particles.setPosition(item.x, item.y);
+      this.particles.setParticleTint(0xFF4444);
+      this.particles.explode(12);
+      this.flashScore('-10', item.x, item.y, '#FF4444');
+      this.cameras.main.shake(220, 0.012);
+      this.flashScreen(0xFF0000);
+      MusicEngine.sfxBad();
+      if (this.lives <= 0) {
+        this.triggerGameOver();
+        return;
+      }
+    }
+    this.updateHUD();
+  }
+
+  flashScore(text, x, y, color) {
+    const t = this.add.text(x, y, text, {
+      fontFamily: 'Press Start 2P', fontSize: '11px', color, stroke: '#000', strokeThickness: 3
+    }).setOrigin(0.5).setDepth(50);
+    this.tweens.add({ targets: t, y: y - 50, alpha: 0, duration: 900, ease: 'Quad.easeOut', onComplete: () => t.destroy() });
+  }
+
+  showCombo() {
+    this.comboText.setText(`${this.combo}× COMBO!`);
+    this.comboText.setAlpha(1);
+    this.tweens.killTweensOf(this.comboText);
+    this.tweens.add({ targets: this.comboText, alpha: 0, duration: 1200, delay: 600 });
+  }
+
+  flashScreen(color) {
+    const flash = this.add.rectangle(240, 270, 480, 540, color, 0.25).setDepth(90);
+    this.tweens.add({ targets: flash, alpha: 0, duration: 300, onComplete: () => flash.destroy() });
+  }
+
+  updateHUD() {
+    this.scoreText.setText(`SCORE: ${this.score}`);
+    const hearts = ['', '♥', '♥ ♥', '♥ ♥ ♥'];
+    this.livesText.setText(hearts[Math.max(0, this.lives)]);
+    document.getElementById('score-display').textContent = this.score;
+    document.getElementById('lives-display').textContent = hearts[Math.max(0, this.lives)];
+    if (this.score > hiScore) {
+      hiScore = this.score;
+      document.getElementById('hi-display').textContent = hiScore;
+    }
+  }
+
+  triggerGameOver() {
+    this.gameOver = true;
+    this.spawnTimer.remove();
+    this.cameras.main.shake(500, 0.02);
+
+    // destroy remaining items
+    this.items.getChildren().forEach(item => {
+      if (item._data?.glowObj) item._data.glowObj.destroy();
+    });
+    this.items.clear(true, true);
+
+    this.time.delayedCall(600, () => {
+      const ov = document.getElementById('overlay');
+      document.getElementById('score-final').textContent = `SCORE: ${this.score}`;
+      document.getElementById('overlay-hi').textContent = `HIGH SCORE: ${hiScore}`;
+      ov.style.display = 'flex';
+      MusicEngine.stop();
+    });
+  }
+}
+
+// ─── 8-BIT INDIAN MUSIC ENGINE ───────────────────────────────────────────────
+// Bhairavi raga flavour: uses komal Re, komal Ga, komal Dha, komal Ni
+// Scale (relative semitones from root C4): C D♭ E♭ F G A♭ B♭ C
+// Melody: square wave lead + triangle bass + noise tabla percussion
+
+const MusicEngine = (() => {
+  let ctx = null, masterGain = null;
+  let playing = false, muted = false;
+  let schedulerTimer = null;
+  let nextNoteTime = 0;
+  let melodyStep = 0, bassStep = 0, percStep = 0;
+  const TEMPO = 148; // BPM
+  const STEP = 60 / TEMPO / 2; // 8th-note duration
+
+  // Bhairavi-inspired melody sequence (MIDI note numbers)
+  // C4=60, Db4=61, Eb4=63, F4=65, G4=67, Ab4=68, Bb4=70, C5=72
+  // Octave up versions for high phrases
+  const MEL = [
+    // Phrase A — ascending with characteristic komal Re ornament
+    60,60,63,65, 67,65,63,61,  60,63,65,67, 70,67,65,63,
+    // Phrase B — upper register dance
+    72,70,68,67, 65,67,68,70,  72,75,72,70, 68,67,65,63,
+    // Phrase C — return, resolving cadence
+    60,61,63,65, 67,68,67,65,  63,61,60,63, 65,67,65,60,
+    // Phrase D — energetic run
+    63,65,67,70, 72,70,67,65,  63,65,63,61, 60,0,60,0,
+  ];
+  // 0 = rest
+
+  // Bass line (root/fifth alternation with some movement)
+  const BASS = [
+    48,0,48,0,  55,0,55,0,  48,0,51,0,  53,0,55,0,
+    48,0,48,0,  55,0,58,0,  48,0,53,0,  55,0,48,0,
+  ];
+
+  // Tabla pattern (16-step): 1=dha, 2=tin, 3=na, 0=rest
+  const TABLA = [
+    1,0,0,2, 0,3,0,0, 1,0,2,0, 3,0,1,0,
+    1,0,0,2, 3,0,1,0, 2,0,0,3, 0,1,0,0,
+  ];
+
+  function midiToHz(note) {
+    return 440 * Math.pow(2, (note - 69) / 12);
+  }
+
+  function playSquare(freq, time, dur, gainVal, detune=0) {
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(freq, time);
+    if (detune) osc.detune.setValueAtTime(detune, time);
+    // 8-bit envelope: instant attack, slight decay, sustain, quick release
+    g.gain.setValueAtTime(0, time);
+    g.gain.linearRampToValueAtTime(gainVal, time + 0.01);
+    g.gain.setValueAtTime(gainVal * 0.7, time + dur * 0.3);
+    g.gain.linearRampToValueAtTime(0, time + dur * 0.92);
+    osc.connect(g); g.connect(masterGain);
+    osc.start(time); osc.stop(time + dur);
+  }
+
+  function playTriangle(freq, time, dur, gainVal) {
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, time);
+    g.gain.setValueAtTime(gainVal, time);
+    g.gain.linearRampToValueAtTime(0, time + dur * 0.8);
+    osc.connect(g); g.connect(masterGain);
+    osc.start(time); osc.stop(time + dur);
+  }
+
+  function playNoise(time, dur, gainVal, filterFreq) {
+    if (!ctx) return;
+    // White noise burst for tabla hit
+    const bufSize = ctx.sampleRate * 0.15;
+    const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = filterFreq;
+    filter.Q.value = 1.5;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(gainVal, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + dur);
+    src.connect(filter); filter.connect(g); g.connect(masterGain);
+    src.start(time); src.stop(time + dur + 0.05);
+  }
+
+  function scheduleNote() {
+    const now = ctx.currentTime;
+    // Schedule ahead by 100ms in ~25ms chunks
+    while (nextNoteTime < now + 0.1) {
+      const t = nextNoteTime;
+
+      // ── Melody (lead square wave) ──
+      const mn = MEL[melodyStep % MEL.length];
+      if (mn !== 0) {
+        const freq = midiToHz(mn);
+        // Add a slight second voice for sitar-like shimmer (5 cents up)
+        playSquare(freq, t, STEP * 0.88, 0.13);
+        playSquare(freq, t, STEP * 0.88, 0.05, 5);
+      }
+      melodyStep++;
+
+      // ── Bass (triangle, every other step) ──
+      if (melodyStep % 2 === 0) {
+        const bn = BASS[bassStep % BASS.length];
+        if (bn !== 0) playTriangle(midiToHz(bn), t, STEP * 1.6, 0.18);
+        bassStep++;
+      }
+
+      // ── Tabla percussion ──
+      const tp = TABLA[percStep % TABLA.length];
+      if (tp === 1) {
+        // Dha — low resonant hit
+        playNoise(t, 0.09, 0.28, 180);
+        playTriangle(80, t, 0.07, 0.12);
+      } else if (tp === 2) {
+        // Tin — mid bright hit
+        playNoise(t, 0.06, 0.22, 600);
+        playTriangle(200, t, 0.04, 0.08);
+      } else if (tp === 3) {
+        // Na — soft muted hit
+        playNoise(t, 0.04, 0.14, 350);
+      }
+      percStep++;
+
+      nextNoteTime += STEP;
+    }
+  }
+
+  function startScheduler() {
+    if (schedulerTimer) clearInterval(schedulerTimer);
+    schedulerTimer = setInterval(scheduleNote, 25);
+  }
+
+  function stopScheduler() {
+    if (schedulerTimer) { clearInterval(schedulerTimer); schedulerTimer = null; }
+  }
+
+  function ensureContext() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = ctx.createGain();
+      masterGain.gain.value = muted ? 0 : 0.55;
+      masterGain.connect(ctx.destination);
+    }
+    if (ctx.state === 'suspended') ctx.resume();
+  }
+
+  return {
+    start() {
+      ensureContext();
+      if (playing) return;
+      playing = true;
+      nextNoteTime = ctx.currentTime + 0.05;
+      melodyStep = 0; bassStep = 0; percStep = 0;
+      if (!muted) startScheduler();
+    },
+    stop() {
+      stopScheduler();
+      playing = false;
+    },
+    toggleMute() {
+      muted = !muted;
+      if (ctx && masterGain) {
+        masterGain.gain.setTargetAtTime(muted ? 0 : 0.55, ctx.currentTime, 0.05);
+      }
+      if (muted) {
+        stopScheduler();
+      } else if (playing) {
+        ensureContext();
+        nextNoteTime = ctx.currentTime + 0.05;
+        startScheduler();
+      }
+      return muted;
+    },
+    isMuted() { return muted; },
+
+    sfxGood(isSpecial) {
+      ensureContext();
+      if (muted) return;
+      const t = ctx.currentTime;
+      if (isSpecial) {
+        // Sparkling ascending arpeggio — 4 quick notes up
+        [0, 7, 12, 16].forEach((semi, i) => {
+          const freq = midiToHz(72 + semi);
+          playSquare(freq, t + i * 0.055, 0.12, 0.18);
+        });
+      } else {
+        // Bright two-tone "ding" — root + fifth
+        playSquare(midiToHz(72), t,        0.10, 0.16);
+        playSquare(midiToHz(79), t + 0.06, 0.09, 0.14);
+      }
+    },
+
+    sfxBad() {
+      ensureContext();
+      if (muted) return;
+      const t = ctx.currentTime;
+      // Descending "thud-buzz" — low square drop + noise burst
+      const osc = ctx.createOscillator();
+      const g   = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(220, t);
+      osc.frequency.exponentialRampToValueAtTime(55, t + 0.18);
+      g.gain.setValueAtTime(0.22, t);
+      g.gain.linearRampToValueAtTime(0, t + 0.22);
+      osc.connect(g); g.connect(masterGain);
+      osc.start(t); osc.stop(t + 0.24);
+      // short noise crack on top
+      playNoise(t, 0.07, 0.30, 280);
+    }
+  };
+})();
+
+function toggleMusic() {
+  const muted = MusicEngine.toggleMute();
+  const btn = document.getElementById('music-btn');
+  const ingameBtn = document.getElementById('ingame-mute-btn');
+  if (muted) {
+    btn.textContent = '♪ MUSIC: OFF';
+    btn.classList.add('muted');
+    ingameBtn.textContent = '♪ UNMUTE';
+    ingameBtn.classList.add('muted');
+  } else {
+    btn.textContent = '♪ MUSIC: ON';
+    btn.classList.remove('muted');
+    ingameBtn.textContent = '♪ MUTE';
+    ingameBtn.classList.remove('muted');
+  }
+}
+
+// ─── BOOT ────────────────────────────────────────────────────────────────────
+buildMenuPreviews(); // draw item sprites into menu canvases
+
+const config = {
+  type: Phaser.AUTO,
+  width: 480,
+  height: 540,
+  backgroundColor: '#070a12',
+  parent: 'game-container',
+  scene: [GameScene],
+  audio: { disableWebAudio: true }
+};
+
+function toggleInGameMute() {
+  const muted = MusicEngine.toggleMute();
+  const btn = document.getElementById('ingame-mute-btn');
+  // also sync the menu music button state
+  const menuBtn = document.getElementById('music-btn');
+  if (muted) {
+    btn.textContent = '♪ UNMUTE';
+    btn.classList.add('muted');
+    menuBtn.textContent = '♪ MUSIC: OFF';
+    menuBtn.classList.add('muted');
+  } else {
+    btn.textContent = '♪ MUTE';
+    btn.classList.remove('muted');
+    menuBtn.textContent = '♪ MUSIC: ON';
+    menuBtn.classList.remove('muted');
+  }
+}
+
+function pauseGame() {
+  if (!gameScene || gameScene.gameOver || gameScene.paused) return;
+  gameScene.paused = true;
+  gameScene.spawnTimer.paused = true;
+  // pause all tweens
+  gameScene.tweens.pauseAll();
+  MusicEngine.stop();
+  document.getElementById('pause-overlay').style.display = 'flex';
+  document.getElementById('pause-btn').textContent = '▶ RESUME';
+  document.getElementById('pause-btn').onclick = resumeGame;
+}
+
+function resumeGame() {
+  if (!gameScene || gameScene.gameOver || !gameScene.paused) return;
+  gameScene.paused = false;
+  gameScene.spawnTimer.paused = false;
+  gameScene.tweens.resumeAll();
+  MusicEngine.start();
+  document.getElementById('pause-overlay').style.display = 'none';
+  document.getElementById('pause-btn').textContent = '⏸ PAUSE';
+  document.getElementById('pause-btn').onclick = pauseGame;
+}
+
+function startGame() {
+  // Hide menu, show game
+  document.getElementById('menu-screen').style.display = 'none';
+  const gs = document.getElementById('game-screen');
+  gs.style.display = 'flex';
+
+  if (game) { game.destroy(true); game = null; }
+  game = new Phaser.Game(config);
+  document.getElementById('score-display').textContent = '0';
+  document.getElementById('lives-display').textContent = '♥ ♥ ♥';
+  document.getElementById('pause-overlay').style.display = 'none';
+  document.getElementById('pause-btn').textContent = '⏸ PAUSE';
+  document.getElementById('pause-btn').onclick = pauseGame;
+  MusicEngine.start();
+}
+
+function restartGame() {
+  document.getElementById('overlay').style.display = 'none';
+  document.getElementById('pause-overlay').style.display = 'none';
+  if (game) { game.destroy(true); game = null; }
+  game = new Phaser.Game(config);
+  document.getElementById('score-display').textContent = '0';
+  document.getElementById('lives-display').textContent = '♥ ♥ ♥';
+  document.getElementById('pause-btn').textContent = '⏸ PAUSE';
+  document.getElementById('pause-btn').onclick = pauseGame;
+  MusicEngine.start();
+}
+
+function goHome() {
+  document.getElementById('overlay').style.display = 'none';
+  document.getElementById('pause-overlay').style.display = 'none';
+  document.getElementById('game-screen').style.display = 'none';
+  if (game) { game.destroy(true); game = null; }
+  document.getElementById('menu-screen').style.display = 'flex';
+  MusicEngine.stop();
+}
+</script>
+</body>
+</html>
